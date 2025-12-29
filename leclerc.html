@@ -1,0 +1,267 @@
+
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>CL16 | Royal Book-Flip Archive</title>
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --baby-blue: #BDE0FE;
+            --dark-red: #7B0000;
+            --f-red: #f41e30;
+            --font-display: "Elephant", serif;
+            --font-script: 'Great Vibes', cursive;
+            --font-body: "Times New Roman", Times, serif;
+            
+            --card-w: 420px; 
+            --card-h: 600px;
+            --mini-w: 180px;
+            --mini-h: 260px;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100vh; width: 100vw;
+            background: radial-gradient(circle at 50% 50%, #F8FDFF 0%, var(--baby-blue) 100%);
+            overflow: hidden; font-family: var(--font-body);
+            display: flex; justify-content: center; align-items: center;
+            perspective: 3000px; 
+        }
+
+        .ui-layout {
+            position: fixed; bottom: 60px; right: 60px;
+            text-align: right; z-index: 1000; pointer-events: none;
+        }
+        .ui-layout h1 {
+            font-family: var(--font-display); font-size: 6.5rem;
+            margin: 0; color: white; line-height: 0.8;
+            text-shadow: 2px 2px 20px rgba(0,0,0,0.1);
+        }
+        .ui-layout h1 span { color: var(--f-red); }
+        .ui-layout .tagline {
+            font-size: 1.4rem; font-style: italic; letter-spacing: 6px;
+            color: rgba(0, 100, 150, 0.3); margin-top: 15px;
+        }
+
+        /* 舞台容器 */
+        .stage-container {
+            position: relative; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .deck-wrapper {
+            position: relative; display: flex; justify-content: center; align-items: center;
+        }
+
+        .card {
+            position: absolute; width: var(--mini-w); height: var(--mini-h);
+            transform-style: preserve-3d;
+            transition: all 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+            cursor: pointer;
+            z-index: 10;
+            /* 默认为中心堆叠位置，由JS初始化为平行 */
+        }
+
+        .card-face {
+            position: absolute; width: 100%; height: 100%;
+            backface-visibility: hidden; border-radius: 12px;
+            border: 6px solid white; box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .card-back {
+            background-color: var(--dark-red);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+
+        .checker-strip {
+            position: absolute; width: 100%; height: 24px; left: 0;
+            background-image: conic-gradient(#fff 90deg, #d00 90deg 180deg, #fff 180deg 270deg, #d00 270deg);
+            background-size: 12px 12px;
+        }
+        .strip-top { top: 12px; border-bottom: 2px solid rgba(0,0,0,0.1); }
+        .strip-bottom { bottom: 12px; border-top: 2px solid rgba(0,0,0,0.1); }
+
+        .back-signature {
+            font-family: var(--font-script);
+            color: white; font-size: 2.8rem;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+
+        .card-front {
+            background: white; transform: rotateY(180deg);
+        }
+        .card-front img { width: 100%; height: 100%; object-fit: cover; }
+
+        .card.flipping {
+            animation: bookFlip 0.25s infinite alternate ease-in-out;
+            transform-origin: left center; 
+        }
+
+        @keyframes bookFlip {
+            0% { transform: translateX(0) rotateY(0deg) translateZ(0); }
+            100% { transform: translateX(20px) rotateY(-180deg) translateZ(50px); }
+        }
+
+        .card.is-drawn {
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            width: var(--card-w) !important;
+            height: var(--card-h) !important;
+            transform: translate(-50%, -50%) rotateY(180deg) !important;
+            z-index: 9999 !important;
+            box-shadow: 0 50px 150px rgba(0,0,0,0.3);
+            margin: 0 !important;
+        }
+
+        .card.fade-out {
+            opacity: 0;
+            transform: scale(0.6) translateY(200px) !important;
+            pointer-events: none;
+        }
+
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(189, 224, 254, 0.4);
+            opacity: 0; visibility: hidden; transition: 0.5s; z-index: 1500;
+        }
+        #overlay.active { opacity: 1; visibility: visible; }
+
+        .action-btn {
+            position: fixed; left: 50%; bottom: 45px; transform: translateX(-50%);
+            background: white; border: none; padding: 18px 65px;
+            font-family: var(--font-display); font-size: 1.1rem; color: var(--dark-red);
+            cursor: pointer; border-radius: 50px; z-index: 2000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1); transition: 0.3s;
+        }
+        .action-btn:hover { color: var(--f-red); transform: translateX(-50%) scale(1.05); }
+        .action-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+    </style>
+</head>
+<body>
+
+    <div id="overlay" onclick="resetAll()"></div>
+
+    <button id="actionBtn" class="action-btn" onclick="handleShuffleProcess()">SHUFFLE ARCHIVE</button>
+
+    <div class="stage-container">
+        <div class="deck-wrapper" id="deck">
+        </div>
+    </div>
+
+    <div class="ui-layout">
+        <p style="margin: 0; letter-spacing: 5px; color: rgba(0, 100, 150, 0.3);">THE UNOFFICIAL COLLECTION</p>
+        <h1>LECLERC <span>16</span></h1>
+        <div class="tagline">PASSION</div>
+    </div>
+
+    <script>
+        const deck = document.getElementById('deck');
+        const actionBtn = document.getElementById('actionBtn');
+        const overlay = document.getElementById('overlay');
+        const cardCount = 9;
+        const images = ["1.jpg", "2.jpg", "3.jpg","4.jpg","5.jpg","6.jpg","7.jpg","8.jpg","9.jpg","10.jpg","11.jpg","12.jpg","13.jpg","14.jpg","15.jpg","16.jpg","17.jpg","18.jpg","19.jpg","20.jpg","21.jpg","22.jpg","23.jpg","24.jpg","25.jpg","26.jpg","27.jpg"]; // 需同目录下有图
+
+        function init() {
+            deck.innerHTML = '';
+            for (let i = 0; i < cardCount; i++) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-face card-back">
+                        <div class="checker-strip strip-top"></div>
+                        <div class="back-signature">Leclerc</div>
+                        <div class="checker-strip strip-bottom"></div>
+                    </div>
+                    <div class="card-face card-front">
+                        <img src="" alt="Charles">
+                    </div>
+                `;
+                // 初始平铺
+                const offset = (i - (cardCount - 1) / 2) * 190;
+                card.style.transform = `translateX(${offset}px)`;
+                card.dataset.offset = offset;
+                card.onclick = () => draw(card);
+                deck.appendChild(card);
+            }
+        }
+
+        async function handleShuffleProcess() {
+            const drawn = document.querySelector('.card.is-drawn');
+            if (drawn) {
+                resetAll();
+                await new Promise(r => setTimeout(r, 800));
+            }
+            startBookShuffle();
+        }
+
+        function startBookShuffle() {
+            actionBtn.classList.add('disabled');
+            const cards = document.querySelectorAll('.card');
+
+            cards.forEach(card => {
+                card.style.transform = `translateX(0)`;
+            });
+
+            setTimeout(() => {
+                cards.forEach((card, i) => {
+                    
+                    setTimeout(() => {
+                        card.classList.add('flipping');
+                    }, i * 40);
+                });
+
+                setTimeout(() => {
+                    cards.forEach((card, i) => {
+                        card.classList.remove('flipping');
+                        setTimeout(() => {
+                            const offset = card.dataset.offset;
+                            card.style.transform = `translateX(${offset}px)`;
+                        }, i * 80);
+                    });
+
+                    setTimeout(() => {
+                        actionBtn.classList.remove('disabled');
+                        actionBtn.innerText = "REDRAW (SHUFFLE)";
+                    }, 1200);
+
+                }, 1800); 
+            }, 600);
+        }
+
+        function draw(card) {
+            if (actionBtn.classList.contains('disabled')) return;
+            if (card.classList.contains('is-drawn')) return;
+
+            const randomImg = images[Math.floor(Math.random() * images.length)];
+            card.querySelector('img').src = randomImg;
+
+            document.querySelectorAll('.card').forEach(c => {
+                if (c !== card) c.classList.add('fade-out');
+            });
+
+            card.classList.add('is-drawn');
+            overlay.classList.add('active');
+            
+            document.body.style.backgroundColor = "#fff";
+            setTimeout(() => { document.body.style.backgroundColor = ""; }, 100);
+        }
+
+        function resetAll() {
+            document.querySelectorAll('.card').forEach((c, i) => {
+                c.classList.remove('is-drawn', 'fade-out', 'flipping');
+                const offset = c.dataset.offset;
+                c.style.transform = `translateX(${offset}px)`;
+            });
+            overlay.classList.remove('active');
+            actionBtn.innerText = "SHUFFLE ARCHIVE";
+        }
+
+        init();
+    </script>
+</body>
+</html>
